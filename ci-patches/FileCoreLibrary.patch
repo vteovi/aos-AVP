@@ -1,0 +1,66 @@
+diff --git a/src/com/archos/filecorelibrary/ListingEngine.java b/src/com/archos/filecorelibrary/ListingEngine.java
+index 335ef78..62b3302 100644
+--- a/src/com/archos/filecorelibrary/ListingEngine.java
++++ b/src/com/archos/filecorelibrary/ListingEngine.java
+@@ -205,8 +205,8 @@ public abstract class ListingEngine {
+     }
+ 
+     protected boolean keepDirectory(String filename) {
+-        // don't keep a hidden directory
+-        if (filename.startsWith(".")) {
++        // don't keep a hidden directory unless hidden files/directories are kept
++        if (filename.startsWith(".") && !mKeepHiddenFiles) {
+             return false;
+         }
+         // don't keep a weird directory
+diff --git a/src/com/archos/filecorelibrary/jcifs/JcifsUtils.java b/src/com/archos/filecorelibrary/jcifs/JcifsUtils.java
+index a635eaa..2278a1d 100644
+--- a/src/com/archos/filecorelibrary/jcifs/JcifsUtils.java
++++ b/src/com/archos/filecorelibrary/jcifs/JcifsUtils.java
+@@ -120,6 +120,12 @@ public class JcifsUtils {
+         // disable dfs makes win10 shares with ms account work
+         prop.put("jcifs.smb.client.dfs.disabled", "true");
+ 
++        // shorter timeouts so unreachable servers fail fast instead of hanging for the 30/35s library defaults
++        prop.put("jcifs.smb.client.connTimeout", "5000");      // TCP connect timeout (ms)
++        prop.put("jcifs.smb.client.soTimeout", "10000");        // socket read timeout (ms)
++        prop.put("jcifs.smb.client.responseTimeout", "10000");  // SMB response timeout (ms)
++        prop.put("jcifs.netbios.soTimeout", "3000");            // NetBIOS socket timeout (ms)
++
+         // needed for Huawei router https://github.com/AgNO3/jcifs-ng/issues/225 using SMB1
+         // see also https://github.com/AgNO3/jcifs-ng/issues/226, not clear it does not interfere with SMB2 only servers
+         prop.put("jcifs.smb.useRawNTLM", "true");
+@@ -166,6 +172,12 @@ public class JcifsUtils {
+         // allow plaintext password fallback
+         prop.put("jcifs.smb.client.disablePlainTextPasswords", "false");
+ 
++        // shorter timeouts so unreachable servers fail fast instead of hanging for the 30/35s library defaults
++        prop.put("jcifs.smb.client.connTimeout", "5000");      // TCP connect timeout (ms)
++        prop.put("jcifs.smb.client.soTimeout", "10000");        // socket read timeout (ms)
++        prop.put("jcifs.smb.client.responseTimeout", "10000");  // SMB response timeout (ms)
++        prop.put("jcifs.netbios.soTimeout", "3000");            // NetBIOS socket timeout (ms)
++
+         PropertyConfiguration propertyConfiguration = null;
+         try {
+             propertyConfiguration = new PropertyConfiguration(prop);
+diff --git a/src/com/archos/filecorelibrary/smbj/SmbjUtils.java b/src/com/archos/filecorelibrary/smbj/SmbjUtils.java
+index 65e8608..4041e8c 100644
+--- a/src/com/archos/filecorelibrary/smbj/SmbjUtils.java
++++ b/src/com/archos/filecorelibrary/smbj/SmbjUtils.java
+@@ -46,6 +46,7 @@ import org.slf4j.LoggerFactory;
+ import java.io.IOException;
+ import java.net.SocketException;
+ import java.util.concurrent.ConcurrentHashMap;
++import java.util.concurrent.TimeUnit;
+ 
+ public class SmbjUtils {
+ 
+@@ -85,6 +86,8 @@ public class SmbjUtils {
+         mContext = context;
+         if (log.isDebugEnabled()) log.debug("SmbjUtils: initializing contexts");
+         smbConfig = SmbConfig.builder().withSecurityProvider(new BCSecurityProvider()).withMultiProtocolNegotiate(true).withSigningRequired(false)
++                .withTimeout(10, TimeUnit.SECONDS)   // request/negotiation wait timeout
++                .withSoTimeout(10, TimeUnit.SECONDS) // socket read timeout
+                 .build();
+     }
+ 

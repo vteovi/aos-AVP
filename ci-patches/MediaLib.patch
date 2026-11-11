@@ -1,0 +1,72 @@
+diff --git a/src/com/archos/mediaprovider/video/NetworkScannerServiceVideo.java b/src/com/archos/mediaprovider/video/NetworkScannerServiceVideo.java
+index 23504f49..9379acf5 100644
+--- a/src/com/archos/mediaprovider/video/NetworkScannerServiceVideo.java
++++ b/src/com/archos/mediaprovider/video/NetworkScannerServiceVideo.java
+@@ -424,6 +424,7 @@ public class NetworkScannerServiceVideo extends Service implements Handler.Callb
+     private static int mFoundFiles = 0;
+     private static final String IN_FOLDER_SELECT = MediaColumns.DATA + " LIKE ?||'%'";
+     private static final String SELECT_ID = BaseColumns._ID + "=?";
++    private static final String KEY_DISPLAY_HIDDEN_FILE = "preference_display_hidden_files";
+     /** scans files into our db */
+     private void doScan(Uri what) {
+         if (log.isDebugEnabled()) log.debug("doScan {}", what);
+@@ -498,6 +499,7 @@ public class NetworkScannerServiceVideo extends Service implements Handler.Callb
+                 }
+               
+                 boolean nfoScanEnabled = NfoParser.isNetworkNfoParseEnabled(this);
++                boolean keepHiddenFiles = PreferenceManager.getDefaultSharedPreferences(this).getBoolean(KEY_DISPLAY_HIDDEN_FILE, false);
+                 BulkOperationHandler bulkHandler = new BulkOperationHandler(nfoScanEnabled, this);
+ 
+                 // prescan list is modified by FileVisitListener to indicate whether
+@@ -508,7 +510,7 @@ public class NetworkScannerServiceVideo extends Service implements Handler.Callb
+                 final String server = extractSmbServer(f.getUri());
+                 final long serverId = getLightIndexServerId(server);
+                 FileVisitListener fileVisitListener = new FileVisitListener(
+-                        mBlacklist, prescanItemsMap, nfoScanEnabled, bulkHandler, serverId);
++                        mBlacklist, prescanItemsMap, nfoScanEnabled, bulkHandler, serverId, keepHiddenFiles);
+ 
+                 FileVisitor.visit(f, RECURSION_LIMIT, fileVisitListener);
+                 boolean traversalHadError = fileVisitListener.hadListingError();
+@@ -575,19 +577,21 @@ public class NetworkScannerServiceVideo extends Service implements Handler.Callb
+         private final List<MetaFile2> mLastPlayedDbs = new ArrayList<MetaFile2>();
+         private final boolean mNfoScanEnabled;
+         private final long mServerId;
++        private final boolean mKeepHiddenFiles;
+         private final HashSet<String> mAlreadyAddedUpnpFiles; //for files analysed DURING scan process
+         private int mStorageId;
+ 
+         private final Blacklist mBlacklist;
+ 
+         public FileVisitListener(Blacklist blacklist, HashMap<String, PrescanItem> prescanItemsMap,
+-                boolean nfoScanEnabled, BulkOperationHandler bulkHandler, long serverId) {
++                boolean nfoScanEnabled, BulkOperationHandler bulkHandler, long serverId, boolean keepHiddenFiles) {
+             if (log.isDebugEnabled()) log.debug("FileVisitListener: serverId={}", serverId);
+             mBlacklist = blacklist;
+             mPrescanItemsMap = prescanItemsMap;
+             mNfoScanEnabled = nfoScanEnabled;
+             mBulkHandler = bulkHandler;
+             mServerId = serverId;
++            mKeepHiddenFiles = keepHiddenFiles;
+             mAlreadyAddedUpnpFiles = new HashSet<>();
+         }
+ 
+@@ -618,8 +622,8 @@ public class NetworkScannerServiceVideo extends Service implements Handler.Callb
+ 
+         @Override
+         public boolean onDirectory(MetaFile2 directory) {
+-            // hidden directories are not scanned
+-            if (ArchosMediaFile.isHiddenFile(directory)) {
++            // hidden directories are not scanned unless hidden files/directories are kept
++            if (!mKeepHiddenFiles && ArchosMediaFile.isHiddenFile(directory)) {
+                 if (log.isDebugEnabled()) log.debug("skipping {}, .hidden!", (directory != null ? directory.getName() : "null"));
+                 return false;
+             }
+@@ -639,7 +643,7 @@ public class NetworkScannerServiceVideo extends Service implements Handler.Callb
+             mFoundFiles ++;
+             int fileType = getFileType(file);
+             if (!isValidType(fileType)) return;
+-            if (ArchosMediaFile.isHiddenFile(file)) return;
++            if (!mKeepHiddenFiles && ArchosMediaFile.isHiddenFile(file)) return;
+             // shortcut for blacklist check for trailer/sample, full should be isBlacklisted
+             if (mBlacklist.isFilenameBlacklisted(FileUtils.getName(file.getUri()))) return;
+             if (log.isTraceEnabled()) log.trace("FileVisitListener.onFile: File {}", file.getUri().toString());

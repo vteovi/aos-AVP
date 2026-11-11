@@ -1,0 +1,121 @@
+diff --git a/res/values-zh-rCN/strings.xml b/res/values-zh-rCN/strings.xml
+index d6efadb3..b7766af0 100644
+--- a/res/values-zh-rCN/strings.xml
++++ b/res/values-zh-rCN/strings.xml
+@@ -243,6 +243,8 @@
+     <string name="rescan_storage_summary">重新扫描内部、SD 卡和 USB 存储设备</string>
+     <string name="preference_display_all_files">在浏览器中显示所有文件</string>
+     <string name="preference_display_all_files_summary">同时显示非视频文件</string>
++    <string name="preference_display_hidden_files">显示隐藏文件夹和文件</string>
++    <string name="preference_display_hidden_files_summary">显示名称以点（.）开头的文件夹及其内部视频</string>
+     <string name="info_processing">正在检查媒体属性…</string>
+     <string name="info_video">视频</string>
+     <string name="info_audio">音频</string>
+diff --git a/res/values-zh-rTW/strings.xml b/res/values-zh-rTW/strings.xml
+index 796c6e3d..32697575 100644
+--- a/res/values-zh-rTW/strings.xml
++++ b/res/values-zh-rTW/strings.xml
+@@ -239,6 +239,8 @@
+     <string name="rescan_storage_summary">重新掃瞄內部、記憶卡和 USB 儲存裝置</string>
+     <string name="preference_display_all_files">在瀏覽器中顯示所有檔案</string>
+     <string name="preference_display_all_files_summary">同時顯示非影片檔案</string>
++    <string name="preference_display_hidden_files">顯示隱藏資料夾和檔案</string>
++    <string name="preference_display_hidden_files_summary">顯示名稱以點（.）開頭的資料夾及其內部影片</string>
+     <string name="info_processing">正在確認媒體的內容...</string>
+     <string name="info_video">影片</string>
+     <string name="info_audio">音訊</string>
+diff --git a/res/values/strings.xml b/res/values/strings.xml
+index 568e53ce..397e034a 100644
+--- a/res/values/strings.xml
++++ b/res/values/strings.xml
+@@ -269,6 +269,8 @@
+     <string name="rescan_storage_summary">Rescan internal, SD Card and USB storage devices</string>
+     <string name="preference_display_all_files">Display all files in browser</string>
+     <string name="preference_display_all_files_summary">Display non-video files too</string>
++    <string name="preference_display_hidden_files">Show hidden folders and files</string>
++    <string name="preference_display_hidden_files_summary">Display folders and files whose name starts with a dot (.), including their videos</string>
+     <string name="info_processing">Checking media properties…</string>
+     <string name="info_video">Video</string>
+     <string name="info_audio">Audio</string>
+diff --git a/res/xml/preferences_video.xml b/res/xml/preferences_video.xml
+index 7c0e55d2..0cae38dd 100644
+--- a/res/xml/preferences_video.xml
++++ b/res/xml/preferences_video.xml
+@@ -645,6 +645,11 @@
+             android:summary="@string/preference_display_all_files_summary"
+             android:key="preference_display_all_files"
+             app:iconSpaceReserved="false"/>
++        <CheckBoxPreference
++            android:defaultValue="false" android:title="@string/preference_display_hidden_files"
++            android:summary="@string/preference_display_hidden_files_summary"
++            android:key="preference_display_hidden_files"
++            app:iconSpaceReserved="false"/>
+ 
+     </PreferenceCategory>
+ 
+diff --git a/src/main/java/com/archos/mediacenter/video/browser/filebrowsing/BrowserByFolder.java b/src/main/java/com/archos/mediacenter/video/browser/filebrowsing/BrowserByFolder.java
+index 4ec067b0..854d44af 100644
+--- a/src/main/java/com/archos/mediacenter/video/browser/filebrowsing/BrowserByFolder.java
++++ b/src/main/java/com/archos/mediacenter/video/browser/filebrowsing/BrowserByFolder.java
+@@ -339,9 +339,10 @@ abstract public class BrowserByFolder extends BrowserByVideoObjects implements
+         try {
+             mListingEngine = ListingEngineFactoryWithUpnp.getListingEngineForUrl(getActivity(), mCurrentDirectory);
+             mListingEngine.setSortOrder(getSortOrder(mSortOrder));
++            mListingEngine.setListingTimeOut(15000); // fail fast after 15s instead of hanging indefinitely
+             ArrayList<String> ext = new ArrayList<>(VideoUtils.getSubtitleExtensions());
+             ext.add(XmlDb.FILE_EXTENSION);
+-            mListingEngine.setKeepHiddenFiles(true);
++            mListingEngine.setKeepHiddenFiles(VideoPreferencesCommon.PreferenceHelper.shouldDisplayHiddenFiles(getActivity()));
+             if (!VideoPreferencesCommon.PreferenceHelper.shouldDisplayAllFiles(getActivity()))
+                 mListingEngine.setFilter(VideoUtils.getVideoFilterMimeTypes(), ext.toArray(new String[0])); // display video files only but retrieve xml DB + subs
+             mListingEngine.setListener(this);
+diff --git a/src/main/java/com/archos/mediacenter/video/leanback/filebrowsing/ListingFragment.java b/src/main/java/com/archos/mediacenter/video/leanback/filebrowsing/ListingFragment.java
+index 1c2b8ebd..51134924 100644
+--- a/src/main/java/com/archos/mediacenter/video/leanback/filebrowsing/ListingFragment.java
++++ b/src/main/java/com/archos/mediacenter/video/leanback/filebrowsing/ListingFragment.java
+@@ -467,6 +467,7 @@ public abstract class ListingFragment extends MyVerticalGridFragment implements
+      * @param listingEngine
+      */
+     protected void setListingEngineOptions(ListingEngine listingEngine){
++        listingEngine.setKeepHiddenFiles(VideoPreferencesCommon.PreferenceHelper.shouldDisplayHiddenFiles(getActivity()));
+         if(!VideoPreferencesCommon.PreferenceHelper.shouldDisplayAllFiles(getActivity()))
+             mListingEngine.setFilter(VideoUtils.getVideoFilterMimeTypes(), null); // display video files only
+     }
+diff --git a/src/main/java/com/archos/mediacenter/video/leanback/network/smb/SmbListingFragment.java b/src/main/java/com/archos/mediacenter/video/leanback/network/smb/SmbListingFragment.java
+index a8514052..56ca2260 100644
+--- a/src/main/java/com/archos/mediacenter/video/leanback/network/smb/SmbListingFragment.java
++++ b/src/main/java/com/archos/mediacenter/video/leanback/network/smb/SmbListingFragment.java
+@@ -69,7 +69,7 @@ public class SmbListingFragment extends NetworkListingFragment {
+ 
+     @Override
+     protected void setListingEngineOptions(ListingEngine listingEngine) {
+-        listingEngine.setKeepHiddenFiles(true);
++        listingEngine.setKeepHiddenFiles(VideoPreferencesCommon.PreferenceHelper.shouldDisplayHiddenFiles(getActivity()));
+         if(!VideoPreferencesCommon.PreferenceHelper.shouldDisplayAllFiles(getActivity()))
+             listingEngine.setFilter(VideoUtils.getVideoFilterMimeTypes(), new String[]{XmlDb.FILE_EXTENSION}); // display video files only but retrieve xml DB
+     }
+diff --git a/src/main/java/com/archos/mediacenter/video/utils/VideoPreferencesCommon.java b/src/main/java/com/archos/mediacenter/video/utils/VideoPreferencesCommon.java
+index aaec03f5..9d50c19d 100644
+--- a/src/main/java/com/archos/mediacenter/video/utils/VideoPreferencesCommon.java
++++ b/src/main/java/com/archos/mediacenter/video/utils/VideoPreferencesCommon.java
+@@ -225,6 +225,7 @@ public class VideoPreferencesCommon implements OnSharedPreferenceChangeListener
+     private static final boolean ACTIVATE_EMAIL_MEDIA_DB = true;
+     private static final String KEY_RESCAN_STORAGE = "rescan_storage" ;
+     private static final String KEY_DISPLAY_ALL_FILE = "preference_display_all_files" ;
++    private static final String KEY_DISPLAY_HIDDEN_FILE = "preference_display_hidden_files" ;
+     private final static String KEY_SCRAPER_CATEGORY = "scraper_category";
+ 
+     private SharedPreferences mSharedPreferences = null;
+@@ -1598,6 +1599,12 @@ public class VideoPreferencesCommon implements OnSharedPreferenceChangeListener
+                 return PreferenceManager.getDefaultSharedPreferences(context).getBoolean(KEY_DISPLAY_ALL_FILE, false);
+             else return false;
+         }
++
++        public static boolean shouldDisplayHiddenFiles(Context context){
++            if (context != null)
++                return PreferenceManager.getDefaultSharedPreferences(context).getBoolean(KEY_DISPLAY_HIDDEN_FILE, false);
++            else return false;
++        }
+     }
+ 
+ }
