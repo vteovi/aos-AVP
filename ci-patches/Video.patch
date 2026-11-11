@@ -94,6 +94,18 @@ index a8514052..56ca2260 100644
          if(!VideoPreferencesCommon.PreferenceHelper.shouldDisplayAllFiles(getActivity()))
              listingEngine.setFilter(VideoUtils.getVideoFilterMimeTypes(), new String[]{XmlDb.FILE_EXTENSION}); // display video files only but retrieve xml DB
      }
+diff --git a/src/main/java/com/archos/mediacenter/video/utils/FolderPicker.java b/src/main/java/com/archos/mediacenter/video/utils/FolderPicker.java
+index 63f8fb85..95b66167 100644
+--- a/src/main/java/com/archos/mediacenter/video/utils/FolderPicker.java
++++ b/src/main/java/com/archos/mediacenter/video/utils/FolderPicker.java
+@@ -388,6 +388,7 @@ public class FolderPicker extends FragmentActivity {
+                     mListingEngine.abort();
+                 }
+                 mListingEngine = ListingEngineFactory.getListingEngineForUrl(getActivity(), uri);
++                mListingEngine.setKeepHiddenFiles(VideoPreferencesCommon.PreferenceHelper.shouldDisplayHiddenFiles(getActivity()));
+                 mListingEngine.setListener(this);
+                 mListingEngine.start();
+ 
 diff --git a/src/main/java/com/archos/mediacenter/video/utils/VideoPreferencesCommon.java b/src/main/java/com/archos/mediacenter/video/utils/VideoPreferencesCommon.java
 index aaec03f5..9d50c19d 100644
 --- a/src/main/java/com/archos/mediacenter/video/utils/VideoPreferencesCommon.java
