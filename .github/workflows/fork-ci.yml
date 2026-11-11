@@ -71,6 +71,23 @@ jobs:
           git checkout 4bf05901
           git apply "$GITHUB_WORKSPACE/ci-patches/Video.patch"
 
+      - name: Generate self-signed keystore and signing config
+        run: |
+          set -e
+          cd nova/Video
+          keytool -genkeypair -v \
+            -keystore nova-release.keystore \
+            -alias nova-release \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass nova123456 -keypass nova123456 \
+            -dname "CN=nova-fork, OU=dev, O=vteovi, L=CN, ST=CN, C=CN"
+          cat > keystore.properties <<'EOF'
+          storeFile=nova-release.keystore
+          storePassword=nova123456
+          keyAlias=nova-release
+          keyPassword=nova123456
+          EOF
+
       - name: Build universal noamazon release APK
         run: |
           cd nova/Video
